@@ -21,7 +21,7 @@
 - [ ] Guerra Contra Destino: #1 a #6, separado de Um Mundo nas Mãos do Destino #1 a #3.
 - [ ] Deadpool e Wolverine: #1 a #7; não importar Absolute Batman #5 que aparece indevidamente em categorias Marvel.
 - [ ] Homem-Aranha 2099: #1.
-- [ ] Invencível: #1 a #16 (e #0 se listado na categoria).
+- [ ] Invencível: #1 a #16.
 - [ ] Savage Dragon: #1 a #9.
 - [ ] The Walking Dead: volumes 1 a 4.
 - [ ] Dungeons & Dragons: #0 a #5.

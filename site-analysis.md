@@ -33,7 +33,7 @@ Este arquivo registra a taxonomia observada no site em 15/11/2026. A extensão u
 | Dynamite Entertainment | Thundercats | #1–#2 | `/category/dynamite-entertainment/thundercats/` |
 | IDW Publishing | Dungeons & Dragons | #0–#5 | `/category/idw-publishing/` |
 | IDW Publishing | Caverna do Dragão: Aventuras de Sábado pela Manhã | #1–#4 | `/category/idw-publishing/caverna-do-dragao/` |
-| Image Comics | Invencível | #0–#16 | `/category/image-comics/invencivel/` |
+| Image Comics | Invencível | #1–#16 | `/category/image-comics/invencivel/` |
 | Image Comics | Savage Dragon | #1–#9 | `/category/image-comics/savage-dragon/` |
 | Image Comics | The Walking Dead | Volumes 1–4 | `/category/image-comics/the-walking-dead/` |
 | Marvel Comics | Quarteto Fantástico | #1 | `/category/marvel-comics/quarteto-fantastico/` |

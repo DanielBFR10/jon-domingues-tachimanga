@@ -24,7 +24,7 @@ abstract class JonDomingues : KeiSource() {
         "/category/dc-comics/",
         "/category/dynamite-entertainment/",
         "/category/idw-publishing/",
-        "/category/image-comics/",
+        "/image-comics/",
         "/category/marvel-comics/",
         "/category/mangas/",
     )
@@ -392,7 +392,15 @@ abstract class JonDomingues : KeiSource() {
     private fun parseEditionLinks(document: org.jsoup.nodes.Document): List<Pair<String, String>> =
         document.select("a[href]").mapNotNull { link ->
             val href = normalizeUrl(link.absUrl("href"))
-            val label = link.text().trim()
+            val label = link.text().trim().ifBlank {
+                link.selectFirst("img")?.let { image ->
+                    firstNonBlank(
+                        image.attr("alt"),
+                        image.attr("title"),
+                        link.attr("aria-label"),
+                    )
+                }.orEmpty()
+            }
             if (!href.startsWith("${baseUrl.trimEnd('/')}/") ||
                 href.contains("/category/") ||
                 href.contains("/page/") ||
@@ -404,12 +412,14 @@ abstract class JonDomingues : KeiSource() {
             }
 
             val isEditionLink = label.startsWith("Ler", ignoreCase = true) ||
+                label.startsWith("Capa", ignoreCase = true) ||
                 link.parents().any { it.normalName() in listOf("h1", "h2", "h3") }
             if (!isEditionLink) return@mapNotNull null
 
             val title = label
                 .replace(Regex("(?i)^ler\\s*/?\\s*baixar\\s*"), "")
                 .replace(Regex("(?i)^ler\\s+"), "")
+                .replace(Regex("(?i)^capa(?:\\s+da\\s+hq|\\s+de)?\\s*:?\\s*"), "")
                 .replace(Regex("(?i)\\s*[–-]\\s*ler online.*$"), "")
                 .replace(Regex("(?i)\\s*[–-]\\s*download.*$"), "")
                 .trim()

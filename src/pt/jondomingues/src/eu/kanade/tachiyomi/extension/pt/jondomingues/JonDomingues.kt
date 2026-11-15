@@ -270,6 +270,7 @@ abstract class JonDomingues : KeiSource() {
     ): List<Pair<String, String>> {
         val results = linkedMapOf<String, String>()
         val normalizedPath = categoryPath.trimEnd('/') + "/"
+        val parentUrl = "${baseUrl.trimEnd('/')}/${normalizedPath.trim('/')}"
         for (page in 1..30) {
             val document = if (page == 1) firstPage else {
                 val pageUrl = "${baseUrl.trimEnd('/')}${normalizedPath.trimEnd('/')}/page/$page/"
@@ -279,8 +280,7 @@ abstract class JonDomingues : KeiSource() {
                 val href = normalizeUrl(link.absUrl("href"))
                 val title = link.text().trim()
                 if (title.isNotBlank() &&
-                    href.startsWith("${baseUrl.trimEnd('/')}/category/") &&
-                    href.trimEnd('/') != "${baseUrl.trimEnd('/')}${normalizedPath}".trimEnd('/')
+                    href.startsWith(parentUrl.trimEnd('/') + "/")
                 ) {
                     results.putIfAbsent(href, title)
                 }

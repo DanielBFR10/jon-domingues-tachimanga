@@ -374,15 +374,19 @@ abstract class JonDomingues : KeiSource() {
                 "${baseUrl.trimEnd('/')}${normalizedPath.trimEnd('/')}/page/$page/"
             }
             val document = client.get(pageUrl, Fetch.DOCUMENT).asJsoup()
+            val previousCount = results.size
             parseEditionLinks(document).forEach { (url, title) ->
                 results.putIfAbsent(url, title)
             }
+            if (page > 1 && results.size == previousCount) break
 
             val hasNext = document.select("a[href]").any { link ->
                 link.attr("rel").equals("next", ignoreCase = true) ||
                     link.hasClass("next") ||
                     link.text().contains("Próxima", ignoreCase = true) ||
                     link.text().contains("Next", ignoreCase = true)
+            } || document.select("button, [role=button]").any { control ->
+                control.text().contains("Carregar mais", ignoreCase = true)
             }
             if (!hasNext) break
         }

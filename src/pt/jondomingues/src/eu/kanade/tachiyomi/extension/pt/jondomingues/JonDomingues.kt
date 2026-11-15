@@ -16,11 +16,9 @@ import okhttp3.HttpUrl.Companion.toHttpUrl
 @Source
 abstract class JonDomingues : KeiSource() {
 
-    override suspend fun getPopularManga(page: Int): MangasPage =
-        fetchListing(if (page == 1) baseUrl else "$baseUrl/page/$page/")
+    override suspend fun getPopularManga(page: Int): MangasPage = fetchListing(if (page == 1) baseUrl else "$baseUrl/page/$page/")
 
-    override suspend fun getLatestUpdates(page: Int): MangasPage =
-        fetchListing(if (page == 1) baseUrl else "$baseUrl/page/$page/")
+    override suspend fun getLatestUpdates(page: Int): MangasPage = fetchListing(if (page == 1) baseUrl else "$baseUrl/page/$page/")
 
     override suspend fun getSearchMangaList(
         page: Int,
@@ -34,15 +32,14 @@ abstract class JonDomingues : KeiSource() {
         return parseListing(client.get(url, Fetch.DOCUMENT).asJsoup())
     }
 
-    private suspend fun fetchListing(url: String): MangasPage =
-        parseListing(client.get(url, Fetch.DOCUMENT).asJsoup())
+    private suspend fun fetchListing(url: String): MangasPage = parseListing(client.get(url, Fetch.DOCUMENT).asJsoup())
 
     private fun parseListing(document: org.jsoup.nodes.Document): MangasPage {
         val mangas = document.select(
-            "article, .post, .elementor-post, .pagelayer-post, .entry"
+            "article, .post, .elementor-post, .pagelayer-post, .entry",
         ).mapNotNull { card ->
             val link = card.selectFirst(
-                "h1 a[href], h2 a[href], h3 a[href], .entry-title a[href], a[href*='jondomingues.com']"
+                "h1 a[href], h2 a[href], h3 a[href], .entry-title a[href], a[href*='jondomingues.com']",
             ) ?: card.selectFirst("a[href]")
             val href = link?.absUrl("href").orEmpty()
             if (href.isBlank() || !href.startsWith(baseUrl)) return@mapNotNull null
@@ -66,7 +63,7 @@ abstract class JonDomingues : KeiSource() {
         }.distinctBy { it.url }
 
         val hasNext = document.selectFirst(
-            "a.next[href], a[rel=next][href], .pagination a[href], .nav-links a[href]"
+            "a.next[href], a[rel=next][href], .pagination a[href], .nav-links a[href]",
         ) != null
         return MangasPage(mangas, hasNext)
     }
@@ -84,7 +81,7 @@ abstract class JonDomingues : KeiSource() {
             manga.apply {
                 title = document.selectFirst("h1")?.text()?.trim().orEmpty().ifBlank { title }
                 description = document.selectFirst(
-                    ".entry-content, .post-content, article"
+                    ".entry-content, .post-content, article",
                 )?.text()?.trim()
                 thumbnail_url = firstNonBlank(
                     document.selectFirst("meta[property=og:image]")?.attr("content").orEmpty(),

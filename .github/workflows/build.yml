@@ -47,6 +47,10 @@ jobs:
           rm -rf extensions-source/src/pt/jondomingues
           cp -R project/src/pt/jondomingues extensions-source/src/pt/jondomingues
 
+      - name: Apply repository formatting
+        working-directory: extensions-source
+        run: ./gradlew --no-daemon :src:pt:jondomingues:spotlessApply
+
       - name: Compile release extension
         working-directory: extensions-source
         run: ./gradlew --no-daemon :src:pt:jondomingues:assembleRelease

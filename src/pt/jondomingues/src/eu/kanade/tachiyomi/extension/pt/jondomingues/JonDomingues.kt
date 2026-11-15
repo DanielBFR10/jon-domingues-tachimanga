@@ -47,7 +47,7 @@ abstract class JonDomingues : KeiSource() {
             val image = card.selectFirst("img")
             SManga.create().apply {
                 url = href.removePrefix(baseUrl)
-                title = link.text().ifBlank {
+                title = link?.text().orEmpty().ifBlank {
                     card.selectFirst("h1, h2, h3")?.text().orEmpty()
                 }.trim()
                 thumbnail_url = image?.let {

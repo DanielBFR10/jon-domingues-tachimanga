@@ -1,0 +1,68 @@
+name: Build Jon Domingues extension
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jon-domingues-build
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Compile and lint extension
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout this project
+        uses: actions/checkout@v4
+        with:
+          path: project
+
+      - name: Checkout Keiyoushi build framework
+        uses: actions/checkout@v4
+        with:
+          repository: keiyoushi/extensions-source
+          ref: main
+          path: extensions-source
+
+      - name: Install Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Copy extension module into framework
+        run: |
+          rm -rf extensions-source/src/pt/jondomingues
+          cp -R project/src/pt/jondomingues extensions-source/src/pt/jondomingues
+
+      - name: Compile release extension
+        working-directory: extensions-source
+        run: ./gradlew --no-daemon :src:pt:jondomingues:assembleRelease
+
+      - name: Run release lint
+        working-directory: extensions-source
+        run: ./gradlew --no-daemon :src:pt:jondomingues:lintRelease
+
+      - name: Upload build outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jon-domingues-build
+          path: |
+            extensions-source/src/pt/jondomingues/build/outputs/apk/release/*.apk
+            extensions-source/src/pt/jondomingues/build/outputs/jar/release/*.jar
+            extensions-source/src/pt/jondomingues/build/reports/
+          if-no-files-found: warn
+          retention-days: 14

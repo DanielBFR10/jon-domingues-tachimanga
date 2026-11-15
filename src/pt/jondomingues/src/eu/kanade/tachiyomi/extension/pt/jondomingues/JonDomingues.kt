@@ -60,6 +60,7 @@ abstract class JonDomingues : KeiSource() {
         SeriesArchive("/category/marvel-comics/justiceiro/", "O Justiceiro (2026)", "O Justiceiro (2026)"),
         SeriesArchive("/category/marvel-comics/os-vingadores/", "Os Vingadores (2023)", "Os Vingadores (2023)"),
         SeriesArchive("/category/marvel-comics/", "Invasão Secreta", "Invasão Secreta"),
+        SeriesArchive("/category/marvel-comics/", "Homem-Aranha 2099", "Homem-Aranha 2099"),
 
         SeriesArchive("/category/mangas/", "Zetman", "Zetman"),
         SeriesArchive("/category/mangas/os-cavaleiros-do-zodiaco/", "CDZ – Saint Seiya", "CDZ – Saint Seiya"),
@@ -87,6 +88,7 @@ abstract class JonDomingues : KeiSource() {
             SManga.create().apply {
                 url = key
                 title = archive.title
+                genre = publisherForArchive(archive.path)
             }
         }.distinctBy { it.url }
 
@@ -153,7 +155,7 @@ abstract class JonDomingues : KeiSource() {
                         document.selectFirst("meta[property=og:image]")?.attr("content").orEmpty(),
                         document.selectFirst(".entry-content img, article img")?.attr("abs:src").orEmpty(),
                     )
-                    genre = document.select("a[rel=tag], .cat-links a").eachText().joinToString(", ")
+                    genre = publisherForArchive(manga.url)
                 }
             }
         } else {
@@ -381,7 +383,7 @@ abstract class JonDomingues : KeiSource() {
                     link.text().contains("Next", ignoreCase = true) ||
                     link.text().contains("Older posts", ignoreCase = true)
             }
-            if (!hasNext && page > 1) break
+            if (!hasNext) break
         }
 
         return results.map { (url, title) -> url to title }
@@ -455,6 +457,16 @@ abstract class JonDomingues : KeiSource() {
 
     private fun normalizeUrl(url: String): String =
         url.substringBefore("#").substringBefore("?").trimEnd('/').let { "$it/" }
+
+    private fun publisherForArchive(path: String): String = when {
+        path.contains("/dc-comics/") -> "DC Comics"
+        path.contains("/dynamite-entertainment/") -> "Dynamite Entertainment"
+        path.contains("/idw-publishing/") -> "IDW Publishing"
+        path.contains("/image-comics/") -> "Image Comics"
+        path.contains("/marvel-comics/") -> "Marvel Comics"
+        path.contains("/mangas/") -> "Mangás"
+        else -> "Outros"
+    }
 
     private fun firstNonBlank(vararg values: String): String =
         values.firstOrNull { it.isNotBlank() }.orEmpty()

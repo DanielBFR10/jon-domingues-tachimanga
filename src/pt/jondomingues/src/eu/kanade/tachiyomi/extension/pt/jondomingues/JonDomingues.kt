@@ -79,9 +79,13 @@ abstract class JonDomingues : KeiSource() {
                 .distinctBy { it.lowercase() }
                 .forEach { seriesTitle ->
                     val key = "__series__/$categoryPath?q=${URLEncoder.encode(seriesTitle, "UTF-8")}"
-                    val hasDedicatedCategory = categories.values.any {
-                        sameSeries(it.title, seriesTitle) ||
-                            categorySlugMatches(it.url, seriesTitle)
+                    val hasDedicatedCategory = categories.values.any { existing ->
+                        if (existing.url.startsWith("__series__/")) {
+                            decodeSeriesUrl(existing.url)?.second?.let { sameSeries(it, seriesTitle) } == true
+                        } else {
+                            sameSeries(existing.title, seriesTitle) ||
+                                categorySlugMatches(existing.url, seriesTitle)
+                        }
                     }
                     if (!hasDedicatedCategory) {
                         categories.putIfAbsent(
@@ -420,13 +424,21 @@ abstract class JonDomingues : KeiSource() {
         return categoryPath to title
     }
 
-    private fun normalizeSeriesTitle(title: String): String = title
-        .replace(Regex("(?i)^ler\\s*/?\\s*baixar\\s*"), "")
-        .replace(Regex("(?i)\\s*(?:#\\s*\\d+|(?:volume|vol\\.?)\\s*\\d+)\\b.*$"), "")
-        .replace(Regex("(?i)\\s*[–-]\\s*ler online.*$"), "")
-        .replace(Regex("(?i)\\s*\\(\\d{4}\\)\\s*$"), "")
-        .trim()
-        .ifBlank { title.trim() }
+    private fun normalizeSeriesTitle(title: String): String {
+        val cleaned = title
+            .replace(Regex("(?i)^ler\\s*/?\\s*baixar\\s*"), "")
+            .replace(Regex("(?i)\\s*[–-]\\s*ler online.*$"), "")
+            .trim()
+        // Keep the publication year so separate relaunches (e.g. Justiceiro
+        // 2022 and Justiceiro 2026) never become one mixed series.
+        val year = Regex("\\((\\d{4})\\)").find(cleaned)?.groupValues?.get(1)
+        val base = cleaned
+            .replace(Regex("(?i)\\s*(?:#\\s*\\d+|(?:volume|vol\\.?)\\s*\\d+)\\b.*$"), "")
+            .replace(Regex("\\s*\\(\\d{4}\\)\\s*$"), "")
+            .trim()
+            .ifBlank { title.trim() }
+        return if (year != null) "$base ($year)" else base
+    }
 
     private fun normalizeUrl(url: String): String =
         url.substringBefore("#").substringBefore("?").trimEnd('/').let { "$it/" }

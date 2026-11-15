@@ -339,10 +339,11 @@ abstract class JonDomingues : KeiSource() {
     private fun sameSeries(first: String, second: String): Boolean {
         val firstYear = Regex("\\((\\d{4})\\)").find(first)?.groupValues?.get(1)
         val secondYear = Regex("\\((\\d{4})\\)").find(second)?.groupValues?.get(1)
-        if (firstYear != null && secondYear != null && firstYear != secondYear) return false
-
         val a = normalizedKey(first.replace(Regex("\\s*\\(\\d{4}\\)\\s*$"), ""))
         val b = normalizedKey(second.replace(Regex("\\s*\\(\\d{4}\\)\\s*$"), ""))
+        if (firstYear != null && secondYear != null && firstYear != secondYear &&
+            !(a == "the boys" && b == "the boys")
+        ) return false
         if (a == b) return true
         val aliases = listOf(
             setOf("absolute batman", "batman absoluto"),

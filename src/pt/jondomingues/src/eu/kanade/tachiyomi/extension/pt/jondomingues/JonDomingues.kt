@@ -92,7 +92,7 @@ abstract class JonDomingues : KeiSource() {
             }
         }.distinctBy { it.url }
 
-        val pageSize = 24
+        val pageSize = 50
         val start = (page - 1).coerceAtLeast(0) * pageSize
         return MangasPage(all.drop(start).take(pageSize), all.size > start + pageSize)
     }
@@ -242,57 +242,6 @@ abstract class JonDomingues : KeiSource() {
             }
     }
 
-    private suspend fun discoverPublisherCategories(): List<String> {
-        val document = client.get(baseUrl, Fetch.DOCUMENT).asJsoup()
-        return document.select("a[href*='/category/']").mapNotNull { link ->
-            val href = normalizeUrl(link.absUrl("href"))
-            val path = href.removePrefix(baseUrl.trimEnd('/'))
-            val segments = path.trim('/').split('/')
-            if (href.startsWith("${baseUrl.trimEnd('/')}/category/") &&
-                segments.size == 2 &&
-                segments.firstOrNull() == "category"
-            ) path else null
-        }.distinct()
-    }
-
-    private suspend fun fetchArchiveCategoryLinks(
-        categoryPath: String,
-        firstPage: org.jsoup.nodes.Document,
-    ): List<Pair<String, String>> {
-        val results = linkedMapOf<String, String>()
-        val normalizedPath = categoryPath.trimEnd('/') + "/"
-        val parentUrl = "${baseUrl.trimEnd('/')}/${normalizedPath.trim('/')}"
-        for (page in 1..30) {
-            val document = if (page == 1) firstPage else {
-                val pageUrl = "${baseUrl.trimEnd('/')}${normalizedPath.trimEnd('/')}/page/$page/"
-                client.get(pageUrl, Fetch.DOCUMENT).asJsoup()
-            }
-            document.select("a[href*='/category/']").forEach { link ->
-                val href = normalizeUrl(link.absUrl("href"))
-                val title = link.text().trim()
-                if (title.isNotBlank() &&
-                    href.startsWith(parentUrl.trimEnd('/') + "/")
-                ) {
-                    results.putIfAbsent(href, title)
-                }
-            }
-            val hasNext = document.select("a[href]").any { link ->
-                link.attr("rel").equals("next", ignoreCase = true) ||
-                    link.hasClass("next") ||
-                    link.text().contains("Próxima", ignoreCase = true) ||
-                    link.text().contains("Next", ignoreCase = true)
-            }
-            if (!hasNext) break
-        }
-        val all = results.toList()
-        return all.filterNot { candidate ->
-            all.any { other ->
-                other.first != candidate.first &&
-                    other.first.startsWith(candidate.first.trimEnd('/') + "/")
-            }
-        }
-    }
-
     private fun findReaderUrl(document: org.jsoup.nodes.Document): String? {
         val contentLinks = document.select(
             ".entry-content a[href], .post-content a[href], article a[href], main a[href]",
@@ -342,14 +291,6 @@ abstract class JonDomingues : KeiSource() {
             setOf("absolute batman", "batman absoluto"),
         )
         return aliases.any { a in it && b in it }
-    }
-
-    private fun categorySlugMatches(categoryUrl: String, title: String): Boolean {
-        val slug = categoryUrl.substringBefore('?').trimEnd('/').substringAfterLast('/')
-        val baseTitle = title.replace(Regex("(?i)\\s*\\(\\d{4}\\)\\s*$"), "").trim()
-        val titleSlug = normalizedKey(baseTitle).replace(' ', '-')
-        if (slug.equals(titleSlug, ignoreCase = true)) return true
-        return sameSeries(slug.replace('-', ' '), baseTitle)
     }
 
     private suspend fun fetchArchiveEntries(categoryPath: String): List<Pair<String, String>> {

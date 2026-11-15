@@ -94,12 +94,7 @@ abstract class JonDomingues : KeiSource() {
         }
 
         val updatedChapters = if (fetchChapters) {
-            document.select("a[href*='/ler-online-'], a[href*='ler-online']").map { link ->
-                SChapter.create().apply {
-                    name = link.text().ifBlank { "Ler online" }.trim()
-                    url = link.absUrl("href").removePrefix(baseUrl)
-                }
-            }.distinctBy { it.url }
+            parseChapters(document, manga.title)
         } else {
             chapters
         }
@@ -123,6 +118,47 @@ abstract class JonDomingues : KeiSource() {
         }.distinct()
 
         return imageUrls.mapIndexed { index, url -> Page(index, imageUrl = url) }
+    }
+
+    /**
+     * The edition page usually links to one reader page for the complete volume.
+     * Do not mistake repeated "Ler online" buttons for separate chapters.
+     *
+     * If the page exposes distinct reader URLs with meaningful chapter labels,
+     * keep those as individual entries. Otherwise expose one honest full-volume
+     * entry; splitting page images into chapters requires an actual table of
+     * contents with reliable page boundaries, which is not guaranteed.
+     */
+    private fun parseChapters(document: org.jsoup.nodes.Document, mangaTitle: String): List<SChapter> {
+        val readerLinks = document.select("a[href*='/ler-online-']")
+            .mapNotNull { link ->
+                val href = link.absUrl("href")
+                if (href.isBlank() || !href.startsWith(baseUrl)) return@mapNotNull null
+                href to link.text().trim()
+            }
+            .distinctBy { it.first }
+
+        if (readerLinks.isEmpty()) return emptyList()
+
+        val meaningful = readerLinks.filter { (_, label) ->
+            label.isNotBlank() && !label.equals("ler online", ignoreCase = true)
+        }
+
+        val entries = if (meaningful.isNotEmpty()) meaningful else {
+            listOf(readerLinks.first().first to "Volume completo")
+        }
+
+        return entries.mapIndexed { index, (href, label) ->
+            SChapter.create().apply {
+                name = if (entries.size == 1 && label.equals("ler online", ignoreCase = true)) {
+                    "$mangaTitle — Volume completo"
+                } else {
+                    label.ifBlank { "$mangaTitle — Parte ${index + 1}" }
+                }
+                url = href.removePrefix(baseUrl)
+                chapter_number = (index + 1).toFloat()
+            }
+        }
     }
 
     private fun firstNonBlank(vararg values: String): String =

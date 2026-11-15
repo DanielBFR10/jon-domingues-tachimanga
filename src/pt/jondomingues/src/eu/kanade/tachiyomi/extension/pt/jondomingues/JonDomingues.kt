@@ -297,20 +297,22 @@ abstract class JonDomingues : KeiSource() {
         val contentLinks = document.select(
             ".entry-content a[href], .post-content a[href], article a[href], main a[href]",
         )
+
+        // The site uses both /ler-online-.../ and /ler-.../ reader routes.
+        // The latter is used by Absolute Batman #1 and must not be discarded.
         val preferred = contentLinks.firstOrNull { link ->
             val href = normalizeUrl(link.absUrl("href"))
             val label = link.text().trim()
             href.startsWith("${baseUrl.trimEnd('/')}/") &&
-                (label.contains("ler online", ignoreCase = true) ||
-                    label.equals("ler", ignoreCase = true)) &&
-                (href.contains("/ler-online-") || href.contains("/ler-online/"))
+                label.contains("ler online", ignoreCase = true) &&
+                !label.contains("baixar", ignoreCase = true)
         }
         if (preferred != null) return normalizeUrl(preferred.absUrl("href"))
 
         return contentLinks.firstOrNull { link ->
             val href = normalizeUrl(link.absUrl("href"))
-            href.startsWith("${baseUrl.trimEnd('/')}/") &&
-                (href.contains("/ler-online-") || href.contains("/ler-online/"))
+            val path = href.removePrefix(baseUrl.trimEnd('/'))
+            href.startsWith("${baseUrl.trimEnd('/')}/") && path.startsWith("/ler-")
         }?.absUrl("href")?.let(::normalizeUrl)
     }
 

@@ -348,9 +348,10 @@ abstract class JonDomingues : KeiSource() {
 
     private fun categorySlugMatches(categoryUrl: String, title: String): Boolean {
         val slug = categoryUrl.substringBefore('?').trimEnd('/').substringAfterLast('/')
-        val titleSlug = normalizedKey(title).replace(' ', '-')
+        val baseTitle = title.replace(Regex("(?i)\\s*\\(\\d{4}\\)\\s*$"), "").trim()
+        val titleSlug = normalizedKey(baseTitle).replace(' ', '-')
         if (slug.equals(titleSlug, ignoreCase = true)) return true
-        return sameSeries(slug.replace('-', ' '), title)
+        return sameSeries(slug.replace('-', ' '), baseTitle)
     }
 
     private suspend fun fetchArchiveEntries(categoryPath: String): List<Pair<String, String>> {

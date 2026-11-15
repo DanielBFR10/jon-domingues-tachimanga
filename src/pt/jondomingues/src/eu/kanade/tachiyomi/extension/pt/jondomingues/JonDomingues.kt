@@ -20,13 +20,49 @@ import java.util.Locale
 @Source
 abstract class JonDomingues : KeiSource() {
 
-    private val publisherCategories = listOf(
-        "/category/dc-comics/",
-        "/category/dynamite-entertainment/",
-        "/category/idw-publishing/",
-        "/image-comics/",
-        "/category/marvel-comics/",
-        "/category/mangas/",
+    private data class SeriesArchive(
+        val path: String,
+        val title: String,
+        val matchTitle: String,
+    )
+
+    // Canonical series archives verified against the site's own category pages.
+    // Aggregate categories (Batman, Universo Absoluto, Doutor Destino, Justiceiro,
+    // Wolverine, etc.) are intentionally filtered by the actual edition title.
+    private val seriesArchives = listOf(
+        SeriesArchive("/category/dc-comics/batman/absolute-batman/", "Absolute Batman", "Absolute Batman"),
+        SeriesArchive("/category/dc-comics/batman/batman-padroes-sombrios/", "Batman: Padrões Sombrios", "Batman: Padrões Sombrios"),
+        SeriesArchive("/category/dc-comics/coringa/", "Coringa: O Homem Que Parou de Rir", "Coringa: O Homem Que Parou de Rir"),
+        SeriesArchive("/category/dc-comics/flash/", "Flashpoint", "Flashpoint"),
+        SeriesArchive("/category/dc-comics/flash-absoluto/", "Flash Absoluto", "Flash Absoluto"),
+        SeriesArchive("/category/dc-comics/hellblazer/", "Hellblazer: Morto na América", "John Constantine, Hellblazer: Morto na América"),
+        SeriesArchive("/category/dc-comics/liga-da-justica/", "Liga da Justiça: Odisseia", "Liga da Justiça: Odisseia"),
+        SeriesArchive("/category/dc-comics/lanterna-verde/", "Lanterna Verde Absoluto", "Lanterna Verde Absoluto"),
+        SeriesArchive("/category/dc-comics/lanterna-verde-2023/", "Lanterna Verde (2023)", "Lanterna Verde (2023)"),
+
+        SeriesArchive("/category/dynamite-entertainment/the-boys/", "The Boys", "The Boys"),
+        SeriesArchive("/category/dynamite-entertainment/thundercats/", "Thundercats", "Thundercats"),
+
+        SeriesArchive("/category/idw-publishing/", "Dungeons & Dragons", "Dungeons & Dragons"),
+        SeriesArchive("/category/idw-publishing/caverna-do-dragao/", "Caverna do Dragão: Aventuras de Sábado pela Manhã", "Caverna do Dragão: Aventuras de Sábado pela Manhã"),
+
+        SeriesArchive("/category/image-comics/invencivel/", "Invencível", "Invencível"),
+        SeriesArchive("/category/image-comics/savage-dragon/", "Savage Dragon", "Savage Dragon"),
+        SeriesArchive("/category/image-comics/the-walking-dead/", "The Walking Dead", "The Walking Dead"),
+
+        SeriesArchive("/category/marvel-comics/quarteto-fantastico/", "Quarteto Fantástico", "Quarteto Fantástico"),
+        SeriesArchive("/category/marvel-comics/deadpool/", "Deadpool e Wolverine", "Deadpool e Wolverine"),
+        SeriesArchive("/category/marvel-comics/doutor-destino/", "Guerra Contra Destino", "Guerra Contra Destino"),
+        SeriesArchive("/category/marvel-comics/doutor-destino/", "Um Mundo nas Mãos do Destino", "Um Mundo nas Mãos do Destino"),
+        SeriesArchive("/category/marvel-comics/homem-aranha/miles-morales-homem-aranha-2019/", "Miles Morales: Homem-Aranha (2019)", "Miles Morales: Homem-Aranha (2019)"),
+        SeriesArchive("/category/marvel-comics/homem-aranha/o-espetacular-homem-aranha/", "O Espetacular Homem-Aranha", "O Espetacular Homem-Aranha"),
+        SeriesArchive("/category/marvel-comics/justiceiro/", "Justiceiro (2022)", "Justiceiro (2022)"),
+        SeriesArchive("/category/marvel-comics/justiceiro/", "O Justiceiro (2026)", "O Justiceiro (2026)"),
+        SeriesArchive("/category/marvel-comics/os-vingadores/", "Os Vingadores (2023)", "Os Vingadores (2023)"),
+        SeriesArchive("/category/marvel-comics/", "Invasão Secreta", "Invasão Secreta"),
+
+        SeriesArchive("/category/mangas/", "Zetman", "Zetman"),
+        SeriesArchive("/category/mangas/os-cavaleiros-do-zodiaco/", "CDZ – Saint Seiya", "CDZ – Saint Seiya"),
     )
 
     override suspend fun getPopularManga(page: Int): MangasPage = fetchSeriesListing(page)
@@ -46,65 +82,18 @@ abstract class JonDomingues : KeiSource() {
     }
 
     private suspend fun fetchSeriesListing(page: Int): MangasPage {
-        val categories = linkedMapOf<String, SManga>()
-        val discoveredPublishers = (publisherCategories + discoverPublisherCategories()).distinct()
-
-        discoveredPublishers.forEach { categoryPath ->
-            val document = client.get("${baseUrl.trimEnd('/')}$categoryPath", Fetch.DOCUMENT).asJsoup()
-            val categoryLinks = fetchArchiveCategoryLinks(categoryPath, document)
-
-            val leafCategories = categoryLinks.filterNot { candidate ->
-                categoryLinks.any { other ->
-                    other.first != candidate.first &&
-                        other.first.startsWith(candidate.first.trimEnd('/') + "/")
-                }
+        val all = seriesArchives.map { archive ->
+            val key = "__series__/${archive.path}?q=${URLEncoder.encode(archive.matchTitle, "UTF-8")}"
+            SManga.create().apply {
+                url = key
+                title = archive.title
             }
+        }.distinctBy { it.url }
 
-            leafCategories.forEach { (href, title) ->
-                val key = href.removePrefix(baseUrl.trimEnd('/'))
-                categories.putIfAbsent(
-                    key,
-                    SManga.create().apply {
-                        url = key
-                        this.title = title
-                    },
-                )
-            }
-
-            // Some sections, such as Mangás, contain series directly in the
-            // publisher archive instead of a dedicated subcategory.
-            fetchArchiveEntries(categoryPath)
-                .map { normalizeSeriesTitle(it.second) }
-                .filter { it.isNotBlank() }
-                .distinctBy { it.lowercase() }
-                .forEach { seriesTitle ->
-                    val key = "__series__/$categoryPath?q=${URLEncoder.encode(seriesTitle, "UTF-8")}"
-                    val hasDedicatedCategory = categories.values.any { existing ->
-                        if (existing.url.startsWith("__series__/")) {
-                            decodeSeriesUrl(existing.url)?.second?.let { sameSeries(it, seriesTitle) } == true
-                        } else {
-                            sameSeries(existing.title, seriesTitle) ||
-                                categorySlugMatches(existing.url, seriesTitle)
-                        }
-                    }
-                    if (!hasDedicatedCategory) {
-                        categories.putIfAbsent(
-                            key,
-                            SManga.create().apply {
-                                url = key
-                                title = seriesTitle
-                            },
-                        )
-                    }
-                }
-        }
-
-        val all = categories.values.sortedBy { it.title.lowercase() }
         val pageSize = 24
         val start = (page - 1).coerceAtLeast(0) * pageSize
         return MangasPage(all.drop(start).take(pageSize), all.size > start + pageSize)
     }
-
     private fun parseListing(document: org.jsoup.nodes.Document): MangasPage {
         val mangas = document.select(
             "article, .post, .elementor-post, .pagelayer-post, .entry",
@@ -367,7 +356,7 @@ abstract class JonDomingues : KeiSource() {
             categoryPath
         }
 
-        for (page in 1..30) {
+        for (page in 1..50) {
             val pageUrl = if (page == 1) {
                 "${baseUrl.trimEnd('/')}$normalizedPath"
             } else {
@@ -378,17 +367,21 @@ abstract class JonDomingues : KeiSource() {
             parseEditionLinks(document).forEach { (url, title) ->
                 results.putIfAbsent(url, title)
             }
+            // Stop only when the next numbered archive page adds no new posts.
+            // WordPress themes often use numeric pagination instead of rel=next.
             if (page > 1 && results.size == previousCount) break
 
+            val nextPagePath = "${normalizedPath.trimEnd('/')}/page/${page + 1}/"
             val hasNext = document.select("a[href]").any { link ->
-                link.attr("rel").equals("next", ignoreCase = true) ||
+                val href = normalizeUrl(link.absUrl("href"))
+                href == normalizeUrl("${baseUrl.trimEnd('/')}$nextPagePath") ||
+                    link.attr("rel").equals("next", ignoreCase = true) ||
                     link.hasClass("next") ||
                     link.text().contains("Próxima", ignoreCase = true) ||
-                    link.text().contains("Next", ignoreCase = true)
-            } || document.select("button, [role=button]").any { control ->
-                control.text().contains("Carregar mais", ignoreCase = true)
+                    link.text().contains("Next", ignoreCase = true) ||
+                    link.text().contains("Older posts", ignoreCase = true)
             }
-            if (!hasNext) break
+            if (!hasNext && page > 1) break
         }
 
         return results.map { (url, title) -> url to title }

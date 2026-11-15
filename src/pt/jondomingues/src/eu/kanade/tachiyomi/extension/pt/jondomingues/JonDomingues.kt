@@ -81,10 +81,10 @@ abstract class JonDomingues : KeiSource() {
             // Some sections, such as Mangás, contain series directly in the
             // publisher archive instead of a dedicated subcategory.
             parseEditionLinks(document)
-                .map { it.first to normalizeSeriesTitle(it.second) }
-                .filter { it.second.isNotBlank() }
-                .distinctBy { it.second.lowercase() }
-                .forEach { (editionUrl, seriesTitle) ->
+                .map { normalizeSeriesTitle(it.second) }
+                .filter { it.isNotBlank() }
+                .distinctBy { it.lowercase() }
+                .forEach { seriesTitle ->
                     val key = "__series__/$categoryPath?q=${URLEncoder.encode(seriesTitle, "UTF-8")}"
                     val hasDedicatedCategory = categories.values.any {
                         it.title.equals(seriesTitle, ignoreCase = true)
@@ -120,9 +120,9 @@ abstract class JonDomingues : KeiSource() {
             val image = card.selectFirst("img")
             SManga.create().apply {
                 url = href.removePrefix(baseUrl)
-                title = normalizeSeriesTitle(link?.text().orEmpty().ifBlank {
+                title = link?.text().orEmpty().ifBlank {
                     card.selectFirst("h1, h2, h3")?.text().orEmpty()
-                }.trim())
+                }.trim()
                 thumbnail_url = image?.let {
                     firstNonBlank(
                         it.attr("abs:data-src"),
@@ -133,7 +133,7 @@ abstract class JonDomingues : KeiSource() {
                     )
                 }
             }.takeIf { it.title.isNotBlank() }
-        }.distinctBy { it.title.lowercase() }
+        }.distinctBy { it.url }
 
         val hasNext = document.selectFirst(
             "a.next[href], a[rel=next][href], .pagination a[href], .nav-links a[href]",
@@ -149,6 +149,7 @@ abstract class JonDomingues : KeiSource() {
     ): SMangaUpdate {
         if (!fetchDetails && !fetchChapters) return SMangaUpdate(manga, chapters)
 
+        val isSeries = manga.url.startsWith("/category/") || manga.url.startsWith("__series__/")
         val archiveUrl = if (manga.url.startsWith("__series__/")) {
             decodeSeriesUrl(manga.url)?.first?.let { "${baseUrl.trimEnd('/')}$it" }
         } else {
@@ -158,20 +159,22 @@ abstract class JonDomingues : KeiSource() {
         val document = client.get(archiveUrl, Fetch.DOCUMENT).asJsoup()
         val updatedManga = if (fetchDetails) {
             manga.apply {
-                description = document.selectFirst(".entry-content, .post-content, article")
-                    ?.text()?.trim().orEmpty()
-                thumbnail_url = firstNonBlank(
-                    document.selectFirst("meta[property=og:image]")?.attr("content").orEmpty(),
-                    document.selectFirst(".entry-content img, article img")?.attr("abs:src").orEmpty(),
-                )
-                genre = document.select("a[rel=tag], .cat-links a").eachText().joinToString(", ")
+                if (isSeries) {
+                    description = document.selectFirst(".entry-content, .post-content, article")
+                        ?.text()?.trim().orEmpty()
+                    thumbnail_url = firstNonBlank(
+                        document.selectFirst("meta[property=og:image]")?.attr("content").orEmpty(),
+                        document.selectFirst(".entry-content img, article img")?.attr("abs:src").orEmpty(),
+                    )
+                    genre = document.select("a[rel=tag], .cat-links a").eachText().joinToString(", ")
+                }
             }
         } else {
             manga
         }
 
         val updatedChapters = if (fetchChapters) {
-            parseSeriesChapters(manga)
+            if (isSeries) parseSeriesChapters(manga) else parseSingleEdition(document)
         } else {
             chapters
         }
@@ -195,6 +198,21 @@ abstract class JonDomingues : KeiSource() {
         }.distinct()
 
         return imageUrls.mapIndexed { index, url -> Page(index, imageUrl = url) }
+    }
+
+    private fun parseSingleEdition(document: org.jsoup.nodes.Document): List<SChapter> {
+        val readerUrl = document.select("a[href*='/ler-online-'], a[href*='/ler-online/']")
+            .map { it.absUrl("href") }
+            .firstOrNull { it.isNotBlank() && it.startsWith(baseUrl) }
+            ?: return emptyList()
+
+        return listOf(
+            SChapter.create().apply {
+                name = "Capítulo 1"
+                url = readerUrl.removePrefix(baseUrl)
+                chapter_number = 1f
+            },
+        )
     }
 
     private suspend fun parseSeriesChapters(manga: SManga): List<SChapter> {

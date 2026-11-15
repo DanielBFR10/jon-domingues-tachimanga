@@ -80,7 +80,7 @@ abstract class JonDomingues : KeiSource() {
 
             // Some sections, such as Mangás, contain series directly in the
             // publisher archive instead of a dedicated subcategory.
-            parseEditionLinks(document)
+            fetchArchiveEntries(categoryPath)
                 .map { normalizeSeriesTitle(it.second) }
                 .filter { it.isNotBlank() }
                 .distinctBy { it.lowercase() }
